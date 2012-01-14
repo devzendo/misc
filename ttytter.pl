@@ -1,4 +1,4 @@
-#!/usr/bin/perl -s
+#!/opt/local/bin/perl -s
 #########################################################################
 #
 # TTYtter v1.2 (c)2007-2011 cameron kaiser (and contributors).
