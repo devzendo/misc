@@ -4371,7 +4371,7 @@ sub standardtweet {
 	# pull it all together
 	$tweet = &wwrap($tweet, ($wrapseq <= 1) ? ((&$prompt(1))[1]) : 0)
 		if ($wrap); # remember to account for prompt length on #1
-	$tweet =~ s/^([^<]*)<([^>]+)>/${g}\1<${EM}\2${colour}>/
+	$tweet =~ s/^([^<]*)<([^>]+)>/${g}$1<${EM}$2${colour}>/
 		unless ($nocolour);
 	$tweet =~ s/\n*$//;
 	$tweet .= ($nocolour) ? "\n" : "$OFF\n";
@@ -4380,11 +4380,30 @@ sub standardtweet {
 	if(scalar(@tracktags)) { # I'm paranoid
 		foreach $h (@tracktags) {
 			$h =~ s/^"//; $h =~ s/"$//; # just in case
-$tweet =~ s/(^|[^a-zA-Z0-9])($h)([^a-zA-Z0-9]|$)/\1${EM}\2${colour}\3/ig
+$tweet =~ s/(^|[^a-zA-Z0-9])($h)([^a-zA-Z0-9]|$)/$1${EM}$2${colour}$3/ig
 			unless ($nocolour);
 		}
 	}
 
+	# If prioritising, set the determined colour for the body of the tweet
+	# to represent its priority
+	if (!$nocolour && exists $ref->{'priority'}) {
+		if ($ref->{'priority'} eq 'high') {
+			$colour =  $WHITE;
+		} elsif ($ref->{'priority'} eq 'default') {
+			$colour =  $GRAY;
+		} elsif ($ref->{'priority'} eq 'low') {
+			$colour =  $YELLOW;
+		}
+		# only do this after the < > portion.
+		my $k = index($tweet, ">");
+		my $botsub = substr($tweet, $k);
+		my $topsub = substr($tweet, 0, $k);
+		$botsub =~ s/^>(.*)$/>${colour}$1/g;
+		$tweet = $topsub . $botsub;
+	}
+
+	# Now underline lists and @mentions, returning to the determined tweet colour.
 	# smb's underline/bold patch goes on last (modified for lists)
 	unless ($nocolour) {
 		# only do this after the < > portion.
@@ -4392,7 +4411,7 @@ $tweet =~ s/(^|[^a-zA-Z0-9])($h)([^a-zA-Z0-9]|$)/\1${EM}\2${colour}\3/ig
 		my $botsub = substr($tweet, $k);
 		my $topsub = substr($tweet, 0, $k);
 		$botsub =~
-s/(^|[^a-zA-Z0-9_])\@([a-zA-Z0-9_\-\/]+)/\1\@${UNDER}\2${colour}/g;
+s/(^|[^a-zA-Z0-9_])\@([a-zA-Z0-9_\-\/]+)/$1\@${UNDER}$2${OFF}${colour}/g;
 		$tweet = $topsub . $botsub;
 	}
 
@@ -4417,7 +4436,7 @@ sub standarddm {
 		unless ($nocolour);
 	$g =~ s/\n*$//;
 	$g .= ($nocolour) ? "\n" : "$OFF\n";
-	$g =~ s/(^|[^a-zA-Z0-9_])\@(\w+)/\1\@${UNDER}\2${OFF}${CCdm}/g
+	$g =~ s/(^|[^a-zA-Z0-9_])\@(\w+)/$1\@${UNDER}$2${OFF}${CCdm}/g
 		unless ($nocolour);
 	return $g;
 }
@@ -5577,6 +5596,8 @@ sub generate_ansi {
 	$YELLOW = ($ansi) ? "${ESC}[33m" : '';
 	$MAGENTA = ($ansi) ? "${ESC}[35m" : '';
 	$CYAN = ($ansi) ? "${ESC}[36m" : '';
+	$GRAY = ($ansi) ? "${ESC}[37m" : '';
+	$WHITE = ($ansi) ? "${ESC}[37;1m" : '';
 
 	$EM = ($ansi) ? "${ESC}[1m" : '';
 	$UNDER = ($ansi) ? "${ESC}[4m" : '';
@@ -5875,7 +5896,7 @@ sub normalizejson {
 		# Fri Mar 20 13:18:18 +0000 2009 (twitter) vs
 		# Fri, 20 Mar 2009 16:35:56 +0000 (search)
 		$i->{'created_at'} =~
-	s/(...), (..) (...) (....) (..:..:..) (.....)/\1 \3 \2 \5 \6 \4/;
+	s/(...), (..) (...) (....) (..:..:..) (.....)/$1 $3 $2 $5 $6 $4/;
 	}
 
 	# normalize newRTs
@@ -5985,7 +6006,7 @@ sub parsejson {
 	# syntax tree passed, so let's turn it into a Perl reference.
 	# have to turn colons into ,s or Perl will gripe. but INTELLIGENTLY!
 	1 while
-	($data =~ s/([^'])'\s*:\s*(true|false|null|\'|\{|\[|-?[0-9])/\1\',\2/);
+	($data =~ s/([^'])'\s*:\s*(true|false|null|\'|\{|\[|-?[0-9])/$1\',$2/);
 
 	# finally, single quotes, just before interpretation.
 	$data =~ s/$ssqqmask/\\'/g;
